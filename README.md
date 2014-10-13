@@ -1,6 +1,21 @@
 start-stop-daemon
 =================
 
+Installation:
+=============
+
+
+gcc start-stop-daemon.c -o start-stop-daemon
+sudo mv start-stop-daemon /usr/sbin/start-stop-daemon
+
+
+Notes:
+======
+The source code was extracted from:
+  http://www.hpcf.upr.edu/web/sites/default/files/start-stop-daemon.c
+
+
+```
 A rewrite of the original Debian's start-stop-daemon Perl script
 in C (faster - it is executed many times during system startup).
 
@@ -24,3 +39,4 @@ Modified for Gentoo rc-scripts by Donny Davies <woodchip@gentoo.org>:
  I removed the BSD/Hurd/OtherOS stuff, added #include <stddef.h>
  and stuck in a #define VERSION "1.9.18".  Now it compiles without
  the whole automake/config.h dance.
+```
