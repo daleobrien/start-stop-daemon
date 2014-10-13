@@ -4,10 +4,12 @@ start-stop-daemon
 Installation:
 =============
 
+Extract the source file to some location and execute the following:
 
-gcc start-stop-daemon.c -o start-stop-daemon
-sudo mv start-stop-daemon /usr/sbin/start-stop-daemon
-
+```
+  gcc start-stop-daemon.c -o start-stop-daemon
+  sudo mv start-stop-daemon /usr/sbin/start-stop-daemon
+```
 
 Notes:
 ======
