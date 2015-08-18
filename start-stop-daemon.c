@@ -25,6 +25,11 @@
  *   the whole automake/config.h dance.
  */
 
+#ifdef HAVE_LXC
+#define _GNU_SOURCE
+#include <sched.h>
+#endif /* HAVE_LXC */
+
 #include <stddef.h>
 #define VERSION "1.9.18"
 
@@ -39,6 +44,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <pwd.h>
@@ -95,6 +101,16 @@ struct schedule_item {
 
 static int schedule_length;
 static struct schedule_item *schedule = NULL;
+
+LIST_HEAD(namespace_head, namespace);
+
+struct namespace {
+	LIST_ENTRY(namespace) list;
+	char *path;
+	int nstype;
+};
+
+static struct namespace_head namespace_head;
 
 static void *xmalloc(int size);
 static void push(struct pid_list **list, pid_t pid);
@@ -174,14 +190,12 @@ xmalloc(int size)
 	fatal("malloc(%d) failed", size);
 }
 
-
 static void
 xgettimeofday(struct timeval *tv)
 {
 	if (gettimeofday(tv,0) != 0)
 		fatal("gettimeofday failed: %s", strerror(errno));
 }
-
 
 static void
 push(struct pid_list **list, pid_t pid)
@@ -206,6 +220,78 @@ clear(struct pid_list **list)
 
 	*list = NULL;
 }
+
+static char *
+next_dirname(const char *s)
+{
+	char *cur;
+
+	cur = (char *)s;
+
+	if (*cur != '\0') {
+		for (; *cur != '/'; ++cur)
+			if (*cur == '\0')
+				return cur;
+
+		for (; *cur == '/'; ++cur)
+			;
+	}
+
+	return cur;
+}
+
+static void
+add_namespace(const char *path)
+{
+	int nstype;
+	char *nsdirname, *nsname, *cur;
+	struct namespace *namespace;
+
+	cur = (char *)path;
+	nsdirname = nsname = "";
+
+	while ((cur = next_dirname(cur))[0] != '\0') {
+		nsdirname = nsname;
+		nsname = cur;
+	}
+
+	if      (!memcmp(nsdirname, "ipcns/", strlen("ipcns/")))
+		nstype = CLONE_NEWIPC;
+	else if (!memcmp(nsdirname, "netns/", strlen("netns/")))
+		nstype = CLONE_NEWNET;
+	else if (!memcmp(nsdirname, "utcns/", strlen("utcns/")))
+		nstype = CLONE_NEWUTS;
+	else
+		badusage("invalid namepspace path");
+
+	namespace = xmalloc(sizeof(*namespace));
+	namespace->path = (char *)path;
+	namespace->nstype = nstype;
+	LIST_INSERT_HEAD(&namespace_head, namespace, list);
+}
+
+#ifdef HAVE_LXC
+static void
+set_namespaces()
+{
+	struct namespace *namespace;
+	int fd;
+
+	LIST_FOREACH(namespace, &namespace_head, list) {
+		if ((fd = open(namespace->path, O_RDONLY)) == -1)
+			fatal("open namespace %s: %s", namespace->path, strerror(errno));
+		if (setns(fd, namespace->nstype) == -1)
+			fatal("setns %s: %s", namespace->path, strerror(errno));
+	}
+}
+#else
+static void
+set_namespaces()
+{
+	if (!LIST_EMPTY(&namespace_head))
+		fatal("LCX namespaces not supported");
+}
+#endif
 
 static void
 do_help(void)
@@ -409,6 +495,7 @@ parse_options(int argc, char * const *argv)
 		{ "test",	  0, NULL, 't'},
 		{ "user",	  1, NULL, 'u'},
 		{ "chroot",	  1, NULL, 'r'},
+		{ "namespace",    1, NULL, 'd'},
 		{ "verbose",	  0, NULL, 'v'},
 		{ "exec",	  1, NULL, 'x'},
 		{ "chuid",	  1, NULL, 'c'},
@@ -421,7 +508,7 @@ parse_options(int argc, char * const *argv)
 	int c;
 
 	for (;;) {
-		c = getopt_long(argc, argv, "HKSVa:n:op:qr:s:tu:vx:c:N:bmR:",
+		c = getopt_long(argc, argv, "HKSVa:n:op:qr:d:s:tu:vx:c:N:bmR:",
 				longopts, (int *) 0);
 		if (c == -1)
 			break;
@@ -477,6 +564,9 @@ parse_options(int argc, char * const *argv)
 			break;
 		case 'r':  /* --chroot /new/root */
 			changeroot = optarg;
+			break;
+		case 'd': /* --namespace /.../<ipcns>|<netns>|<utsns>/name */
+			add_namespace(optarg);
 			break;
 		case 'N':  /* --nice */
 			nicelevel = atoi(optarg);
@@ -835,6 +925,8 @@ main(int argc, char **argv)
 {
 	progname = argv[0];
 
+	LIST_INIT(&namespace_head);
+
 	parse_options(argc, argv);
 	argc -= optind;
 	argv += optind;
@@ -959,6 +1051,7 @@ main(int argc, char **argv)
 		fprintf(pidf, "%d\n", pidt);
 		fclose(pidf);
 	}
+	set_namespaces();
 	execv(startas, argv);
 	fatal("Unable to start %s: %s", startas, strerror(errno));
 }
