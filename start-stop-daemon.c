@@ -57,6 +57,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <error.h>
+#include <linux/sched.h>
 
 static int testmode = 0;
 static int quietmode = 0;
