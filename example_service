@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# Derived from https://gist.github.com/sodik82/4f4aafdb52e84102b75d
+
+set -e
+. /lib/lsb/init-functions
+
+# Must be a valid filename
+NAME=foo
+PIDFILE=/run/$NAME.pid
+
+# Full path to executable
+DAEMON=/usr/local/bin/bar
+
+# Options
+DAEMON_OPTS="--baz=quux"
+
+# User to run the command as
+USER=www
+
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+
+case "$1" in
+  start)
+        echo -n "Starting daemon: "$NAME
+        start-stop-daemon --start --quiet -b -m --pidfile $PIDFILE --chdir $WORK_DIR --chuid $USER --exec $DAEMON -- $DAEMON_OPTS
+        echo "."
+        ;;
+  stop)
+        echo -n "Stopping daemon: "$NAME
+        start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE
+        echo "."
+        ;;
+  restart)
+        echo -n "Restarting daemon: "$NAME
+        start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile $PIDFILE
+        start-stop-daemon --start --quiet -b -m --pidfile $PIDFILE --chdir $WORK_DIR --chuid $USER --exec $DAEMON -- $DAEMON_OPTS
+        echo "."
+        ;;
+  status)
+        status_of_proc -p $PIDFILE $DAEMON $NAME && exit 0 || exit $?
+        ;;
+
+  *)
+        echo "Usage: "$1" {start|stop|restart}"
+        exit 1
+esac

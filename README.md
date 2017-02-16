@@ -11,6 +11,10 @@ Extract the source file to some location and execute the following:
   sudo mv start-stop-daemon /usr/sbin/start-stop-daemon
 ```
 
+Example Usage:
+========
+Please see `example_service`
+
 Notes:
 ======
 The source code was extracted from:
