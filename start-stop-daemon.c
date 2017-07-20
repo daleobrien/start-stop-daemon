@@ -312,6 +312,7 @@ do_help(void)
 "  -p|--pidfile <pid-file>       pid file to check\n"
 "  -c|--chuid <name|uid[:group|gid]>\n"
 "  		change to this user/group before starting process\n"
+"  -r|--chroot <directory>       change root directory of running process\n"
 "  -u|--user <username>|<uid>    stop processes owned by this user\n"
 "  -n|--name <process-name>      stop processes with this name\n"
 "  -s|--signal <signal>          signal to send (default TERM)\n"
@@ -725,7 +726,7 @@ static void
 do_findprocs(void)
 {
 	clear(&found);
-	
+
 	if (pidfile)
 		do_pidfile(pidfile);
 	else
@@ -742,10 +743,10 @@ do_stop(int signal_nr, int quietmode, int *n_killed, int *n_notkilled, int retry
  
  	*n_killed = 0;
  	*n_notkilled = 0;
- 
+
  	if (!found)
  		return;
- 
+
  	clear(&killed);
 
 	for (p = found; p; p = p->next) {
